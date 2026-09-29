@@ -1,0 +1,44 @@
+.back-btn {
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.reply-composer-section {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.replies-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.reply-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.reply-body {
+  flex: 1;
+}
+
+.reply-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.reply-content {
+  font-size: 15px;
+  line-height: 1.4;
+  word-break: break-word;
+}

@@ -1,0 +1,10 @@
+/* HomeFeed Styles */
+.home-tabs {
+  margin-top: var(--space-sm);
+  border-bottom: none;
+}
+
+.home-feed-list {
+  display: flex;
+  flex-direction: column;
+}

@@ -1,0 +1,42 @@
+/* ============================================
+   Chirp App — Global App Styles
+   ============================================ */
+
+/* Page header (sticky top bar for each page) */
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(var(--bg-primary-rgb, 254, 250, 246), 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--space-sm) var(--space-md);
+}
+
+[data-theme="dark"] .page-header {
+  background: rgba(26, 26, 46, 0.85);
+}
+
+.page-header h1 {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.page-header-sub {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+/* Feed container */
+.feed-container {
+  min-height: 100vh;
+}
+
+/* Page transitions */
+.page-enter {
+  animation: fadeIn var(--transition-base) ease;
+}

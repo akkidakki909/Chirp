@@ -1,0 +1,53 @@
+/* Bookmarks Page Styles */
+.bm-collections {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+}
+
+.bm-collection-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bm-collection-chip:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.bm-collection-chip.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.bm-chip-count {
+  background: var(--bg-tertiary);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.bm-collection-chip.active .bm-chip-count {
+  background: var(--color-primary);
+  color: white;
+}
+
+.bm-posts {
+  display: flex;
+  flex-direction: column;
+}

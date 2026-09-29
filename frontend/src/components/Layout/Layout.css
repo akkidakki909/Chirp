@@ -1,0 +1,45 @@
+/* Layout Styles */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  margin-left: var(--sidebar-width);
+  margin-right: var(--right-panel-width);
+  flex: 1;
+  min-height: 100vh;
+  max-width: var(--feed-max-width);
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  /* Center the feed between sidebar and right panel */
+  position: relative;
+  left: calc((var(--sidebar-width) - var(--right-panel-width)) / 2);
+}
+
+@media (max-width: 1280px) {
+  .main-content {
+    left: calc((var(--sidebar-width) - var(--right-panel-width)) / 2);
+  }
+}
+
+@media (max-width: 1024px) {
+  .main-content {
+    left: calc(var(--sidebar-width) / 2);
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    left: 0;
+    margin-left: 0;
+    margin-right: 0;
+    border-left: none;
+    border-right: none;
+    padding-bottom: 70px; /* space for bottom nav */
+  }
+}

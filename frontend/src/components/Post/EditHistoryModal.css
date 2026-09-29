@@ -1,0 +1,37 @@
+/* Edit History Modal Styles */
+.edit-history-modal {
+  max-width: 500px;
+}
+
+.edit-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.edit-history-item {
+  position: relative;
+}
+
+.edit-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.edit-history-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.edit-history-content {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+  padding: var(--space-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}

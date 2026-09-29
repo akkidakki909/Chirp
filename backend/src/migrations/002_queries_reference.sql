@@ -1,0 +1,76 @@
+-- ============================================================
+-- Reference queries used by the app (kept here so you can paste
+-- them straight into your project report / viva).
+-- ============================================================
+
+-- ---------- 1. Recursive CTE: full reply thread for a tweet ----------
+-- Used by GET /api/tweets/:id/thread
+--
+-- WITH RECURSIVE thread AS (
+--   SELECT id, user_id, content, parent_tweet_id, created_at, 0 AS depth
+--   FROM tweets
+--   WHERE id = $1
+--   UNION ALL
+--   SELECT t.id, t.user_id, t.content, t.parent_tweet_id, t.created_at, th.depth + 1
+--   FROM tweets t
+--   JOIN thread th ON t.parent_tweet_id = th.id
+-- )
+-- SELECT * FROM thread ORDER BY depth, created_at;
+
+-- ---------- 2. Full-text search ----------
+-- Used by GET /api/search?q=...
+--
+-- SELECT id, user_id, content, ts_rank(search_vector, query) AS rank
+-- FROM tweets, plainto_tsquery('english', $1) query
+-- WHERE search_vector @@ query
+-- ORDER BY rank DESC
+-- LIMIT 20;
+
+-- ---------- 3. Pull-based feed (read-time join) ----------
+-- Used by GET /api/feed?mode=pull
+--
+-- SELECT t.* FROM tweets t
+-- WHERE t.user_id IN (SELECT followee_id FROM follows WHERE follower_id = $1)
+--    OR t.user_id = $1
+-- ORDER BY t.created_at DESC
+-- LIMIT 20 OFFSET $2;                 -- naive version, for benchmarking against cursor version below
+--
+-- Cursor-based version (no OFFSET, scales better):
+-- ... AND t.created_at < $2  ORDER BY t.created_at DESC LIMIT 20;
+
+-- ---------- 4. Fan-out feed (precomputed) ----------
+-- Used by GET /api/feed?mode=fanout
+--
+-- SELECT f.tweet_id, f.tweet_created_at, f.author_id
+-- FROM feed_entries f
+-- WHERE f.owner_id = $1
+-- ORDER BY f.tweet_created_at DESC
+-- LIMIT 20;
+
+-- ---------- 5. Transaction isolation demo (double-like race) ----------
+-- Run these two in separate psql sessions to demonstrate the anomaly,
+-- then re-run at SERIALIZABLE to show it fixed. Put screenshots of both
+-- in your report — this is a big talking point in viva.
+--
+-- Session A                                   Session B
+-- BEGIN;                                       BEGIN;
+-- SELECT like_count FROM tweets WHERE id=$1;   SELECT like_count FROM tweets WHERE id=$1;
+-- -- both read e.g. 10
+-- UPDATE tweets SET like_count = 11 WHERE id=$1;
+-- COMMIT;
+--                                               UPDATE tweets SET like_count = 11 WHERE id=$1;
+--                                               COMMIT;
+-- Result at READ COMMITTED: ends at 11 (lost update — should be 12)
+-- Result at SERIALIZABLE: second COMMIT throws a serialization_failure,
+--   forcing the app to retry — correct outcome.
+--
+-- SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; -- run at start of each session to compare
+
+-- ---------- 6. Window functions ----------
+-- SELECT id, content, like_count,
+--        RANK() OVER (ORDER BY like_count DESC) AS like_rank
+-- FROM tweets WHERE user_id = $1;
+
+-- SELECT id, username, followers_count,
+--        RANK() OVER (ORDER BY followers_count DESC) AS follower_rank
+-- FROM users;
