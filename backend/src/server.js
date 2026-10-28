@@ -11,6 +11,10 @@ import followRoutes from './routes/follows.js';
 import engagementRoutes from './routes/engagement.js';
 import searchRoutes from './routes/search.js';
 import analyticsRoutes from './routes/analytics.js';
+import messageRoutes from './routes/messages.js';
+import notificationRoutes from './routes/notifications.js';
+import profileRoutes from './routes/profiles.js';
+import trendingRoutes from './routes/trending.js';
 
 dotenv.config();
 
@@ -26,6 +30,10 @@ app.use('/api/follows', followRoutes);
 app.use('/api', engagementRoutes);       // /api/likes/:id, /api/retweets/:id
 app.use('/api/search', searchRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/profiles', profileRoutes);
+app.use('/api/trending', trendingRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

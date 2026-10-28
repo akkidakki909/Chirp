@@ -17,13 +17,12 @@ router.post('/likes/:tweetId', requireAuth, async (req, res) => {
   const tweet = await getTweetMeta(req.params.tweetId);
   if (!tweet) return res.status(404).json({ error: 'Tweet not found' });
 
-  await query(
-    `INSERT INTO likes (user_id, tweet_id, tweet_created_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+  const liked = await query(
+    `INSERT INTO likes (user_id, tweet_id, tweet_created_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING user_id`,
     [req.userId, tweet.id, tweet.created_at]
   );
-  if (tweet.user_id !== req.userId) {
-    await query(`INSERT INTO notifications (user_id, actor_id, type, tweet_id) VALUES ($1,$2,'like',$3)`,
-      [tweet.user_id, req.userId, tweet.id]);
+  if (liked.rowCount && tweet.user_id !== req.userId) {
+    await query(`INSERT INTO notifications (user_id, actor_id, type, tweet_id) VALUES ($1,$2,'like',$3)`, [tweet.user_id, req.userId, tweet.id]);
   }
   res.status(204).end();
 });

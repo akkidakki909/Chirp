@@ -77,6 +77,7 @@ router.get('/', requireAuth, async (req, res) => {
 
           AND t.created_at < $2
           AND t.deleted_at IS NULL
+          AND t.is_reply = false
           AND u.deleted_at IS NULL
 
         ORDER BY t.created_at DESC
@@ -123,6 +124,7 @@ router.get('/', requireAuth, async (req, res) => {
           f.owner_id = $1
           AND f.tweet_created_at < $2
           AND t.deleted_at IS NULL
+          AND t.is_reply = false
           AND u.deleted_at IS NULL
 
         ORDER BY f.tweet_created_at DESC

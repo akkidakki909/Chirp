@@ -5,14 +5,15 @@ import {
   FiHome, FiSearch, FiBell, FiMail, FiBookmark,
   FiUser, FiFeather, FiSun, FiMoon, FiMoreHorizontal, FiLogOut
 } from 'react-icons/fi';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { apiClient } from '../../api/client';
 import './Sidebar.css';
 
 const navItems = [
   { path: '/', icon: FiHome, label: 'Home' },
   { path: '/explore', icon: FiSearch, label: 'Explore' },
-  { path: '/notifications', icon: FiBell, label: 'Notifications', badge: 3 },
-  { path: '/messages', icon: FiMail, label: 'Messages', badge: 2 },
+  { path: '/notifications', icon: FiBell, label: 'Notifications' },
+  { path: '/messages', icon: FiMail, label: 'Messages' },
   { path: '/bookmarks', icon: FiBookmark, label: 'Bookmarks' },
   { path: '/profile', icon: FiUser, label: 'Profile' },
 ];
@@ -22,6 +23,8 @@ export default function Sidebar() {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [counts, setCounts] = useState({ notifications: 0, messages: 0 });
+  useEffect(() => { let live = true; const load = async () => { try { const [n,m] = await Promise.all([apiClient.get('/notifications/unread-count'), apiClient.get('/messages/unread-count')]); if(live) setCounts({notifications:n.data.count||0,messages:m.data.count||0}); } catch (e) { console.warn('Could not refresh sidebar counts', e.message); } }; load(); const timer=setInterval(load,15000); window.addEventListener('focus',load); return()=>{live=false;clearInterval(timer);window.removeEventListener('focus',load);}; }, []);
 
   return (
     <aside className="sidebar" id="main-sidebar">
@@ -43,7 +46,7 @@ export default function Sidebar() {
             >
               <span className="nav-icon-wrapper">
                 <item.icon className="nav-icon" />
-                {item.badge && <span className="nav-badge">{item.badge}</span>}
+                {((item.label === 'Notifications' && counts.notifications) || (item.label === 'Messages' && counts.messages)) > 0 && <span className="nav-badge">{item.label === 'Notifications' ? counts.notifications : counts.messages}</span>}
               </span>
               <span className="nav-label">{item.label}</span>
             </NavLink>
@@ -78,7 +81,7 @@ export default function Sidebar() {
               <button className="user-menu-item" onClick={() => navigate('/profile')}>
                 <FiUser /> View Profile
               </button>
-              <button className="user-menu-item text-danger">
+              <button className="user-menu-item text-danger" onClick={() => { setShowUserMenu(false); navigate('/'); window.location.reload(); }}>
                 <FiLogOut /> Log out
               </button>
             </div>

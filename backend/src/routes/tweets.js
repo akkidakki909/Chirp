@@ -29,6 +29,16 @@ router.post('/', requireAuth, async (req, res) => {
   );
   const tweet = rows[0];
 
+  // Notify followers about a new top-level post; replies notify the parent author.
+  if (parentTweetId) {
+    const parent = await query('SELECT user_id FROM tweets WHERE id=$1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1', [parentTweetId]);
+    if (parent.rows[0] && parent.rows[0].user_id !== req.userId) {
+      await query("INSERT INTO notifications(user_id,actor_id,type,tweet_id) VALUES($1,$2,'reply',$3)", [parent.rows[0].user_id, req.userId, tweet.id]);
+    }
+  } else {
+    await query("INSERT INTO notifications(user_id,actor_id,type,tweet_id) SELECT follower_id,$1,'post',$2 FROM follows WHERE followee_id=$1 AND follower_id<>$1", [req.userId, tweet.id]);
+  }
+
   // hashtags: extract, upsert, link, bump Redis trending
   const tags = [...content.matchAll(/#(\w+)/g)].map(m => m[1]);
   for (const tag of tags) {
