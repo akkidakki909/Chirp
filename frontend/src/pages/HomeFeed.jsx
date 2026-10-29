@@ -13,18 +13,19 @@ function convertApiTweet(tweet) {
     content: tweet.content,
     createdAt: tweet.createdAt,
 
-    likes: tweet.likeCount ?? 0,
-    comments: tweet.replyCount ?? 0,
-    reposts: tweet.retweetCount ?? 0,
+    likes: tweet.likes ?? tweet.likeCount ?? tweet.like_count ?? 0,
+    comments: tweet.comments ?? tweet.replyCount ?? tweet.reply_count ?? 0,
+    reposts: tweet.reposts ?? tweet.retweetCount ?? tweet.retweet_count ?? 0,
     bookmarks: 0,
 
     isLiked: false,
     isReposted: false,
     isBookmarked: false,
 
-    images: [],
-    poll: null,
-    isEdited: false,
+    images: tweet.images?.length ? tweet.images : (tweet.imageUrls?.length ? tweet.imageUrls : (tweet.image_urls?.length ? tweet.image_urls : (tweet.imageUrl ? [tweet.imageUrl] : []))),
+    poll: tweet.poll || null,
+    editCount: tweet.editCount || 0,
+    isEdited: (tweet.editCount || 0) > 0,
     editHistory: [],
   };
 }

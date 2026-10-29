@@ -1,2 +1,143 @@
-import {useEffect,useState} from 'react';import {useParams,useNavigate} from 'react-router-dom';import {useAuth} from '../context/AuthContext';import {apiClient} from '../api/client';import PostCard from '../components/Post/PostCard';import {format} from 'date-fns';import {FiCalendar,FiMapPin,FiLink,FiArrowLeft} from 'react-icons/fi';import './Profile.css';
-export default function Profile(){const {username}=useParams();const {user:currentUser}=useAuth();const navigate=useNavigate();const [data,setData]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');useEffect(()=>{let live=true;(async()=>{try{setLoading(true);const name=username||currentUser?.username;if(!name)return;const r=await apiClient.get(`/profiles/${encodeURIComponent(name)}`);if(live)setData(r.data);}catch(e){if(live)setError(e.response?.status===404?'User not found':e.response?.data?.error||'Could not load profile');}finally{if(live)setLoading(false);}})();return()=>{live=false};},[username,currentUser?.username]);const [tab,setTab]=useState('posts');if(loading)return <div className="feed-container"><p>Loading profile…</p></div>;if(error||!data)return <div className="feed-container page-enter"><div className="page-header"><button className="btn-ghost" onClick={()=>navigate(-1)}><FiArrowLeft/></button><h1>Profile</h1></div><div className="empty-state"><p className="font-semibold">{error||'User not found'}</p></div></div>;const u=data.user;const own=String(u.id)===String(currentUser?.id);const follow=async()=>{try{if(u.is_following){await apiClient.delete(`/profiles/${u.id}/follow`);setData(d=>({...d,user:{...d.user,is_following:false,followers_count:Math.max(0,d.user.followers_count-1)}}));}else{await apiClient.post(`/profiles/${u.id}/follow`);setData(d=>({...d,user:{...d.user,is_following:true,followers_count:Number(d.user.followers_count)+1}}));}}catch(e){setError(e.response?.data?.error||'Follow action failed');}};const posts=data.posts||[];const join=u.created_at?format(new Date(u.created_at),'MMMM yyyy'):'—';return <div className="feed-container page-enter" id="profile-page"><div className="page-header"><div className="flex items-center gap-md"><button className="btn-ghost" onClick={()=>navigate(-1)}><FiArrowLeft/></button><div><h1 style={{fontSize:'var(--text-lg)'}}>{u.display_name}</h1><span className="page-header-sub">{u.posts_count||posts.length} posts</span></div></div></div><div className="profile-banner">{u.banner_url&&<img src={u.banner_url} alt="Profile banner" className="profile-banner-img"/>}</div><div className="profile-avatar-row"><img src={u.avatar_url||''} alt={u.display_name} className="avatar avatar-3xl profile-avatar"/><div className="profile-actions">{!own&&<><button className={`btn ${u.is_following?'btn-secondary':'btn-primary'}`} onClick={follow}>{u.is_following?'Unfollow':'Follow'}</button><button className="btn btn-secondary" onClick={()=>navigate(`/messages?user=${encodeURIComponent(u.id)}`)}>Message</button></>}</div></div><div className="profile-info"><div className="profile-name-row"><h2 className="profile-display-name font-heading">{u.display_name}</h2>{u.is_verified&&<span className="verified-badge">✓</span>}</div><span className="profile-handle text-secondary">@{u.username}</span>{u.bio&&<p className="profile-bio">{u.bio}</p>}<div className="profile-meta">{u.location&&<span className="profile-meta-item text-secondary"><FiMapPin size={14}/>{u.location}</span>}{u.website&&<a href={/^https?:\/\//i.test(u.website)?u.website:`https://${u.website}`} target="_blank" rel="noreferrer" className="profile-meta-item"><FiLink size={14}/>{u.website}</a>}<span className="profile-meta-item text-secondary"><FiCalendar size={14}/>Joined {join}</span></div><div className="profile-stats"><span className="profile-stat"><strong>{u.following_count||0}</strong><span className="text-secondary">Following</span></span><span className="profile-stat"><strong>{u.followers_count||0}</strong><span className="text-secondary">Followers</span></span></div></div><div className="tabs"><button className={`tab ${tab==='posts'?'active':''}`} onClick={()=>setTab('posts')}>Posts</button></div><div className="profile-posts">{posts.length?posts.map(p=><PostCard key={p.id} post={p}/>):<div className="empty-state"><p className="font-semibold">No posts yet</p></div>}</div></div>}
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { apiClient } from '../api/client';
+import { users as mockUsers, posts as mockPosts } from '../data/mockData';
+import PostCard from '../components/Post/PostCard';
+import { FiArrowLeft, FiMessageCircle, FiUserPlus, FiUserCheck } from 'react-icons/fi';
+import './Profile.css';
+
+const mapPost = (p) => ({
+  ...p,
+  userId: p.userId ?? p.user_id,
+  createdAt: p.createdAt ?? p.created_at,
+  likes: p.likes ?? p.likeCount ?? p.like_count ?? 0,
+  reposts: p.reposts ?? p.retweetCount ?? p.retweet_count ?? 0,
+  comments: p.comments ?? p.replyCount ?? p.reply_count ?? 0,
+  images: p.images ?? p.imageUrls ?? p.image_urls ?? [],
+  user: p.user || {
+    id: p.userId ?? p.user_id,
+    username: p.username,
+    displayName: p.displayName ?? p.display_name ?? p.username,
+    handle: `@${p.username}`,
+    avatar: p.avatar ?? p.avatar_url ?? '',
+    isVerified: !!(p.isVerified ?? p.is_verified),
+  },
+});
+
+function mockProfileFor(username) {
+  const user = mockUsers.find((u) => u.username?.toLowerCase() === String(username || '').toLowerCase());
+  if (!user) return null;
+  return {
+    id: user.id,
+    username: user.username,
+    display_name: user.displayName || user.username,
+    avatar_url: user.avatar || '',
+    banner_url: user.banner || '',
+    bio: user.bio || '',
+    followers_count: user.followersCount || 0,
+    following_count: user.followingCount || 0,
+    is_verified: !!user.isVerified,
+    isMockProfile: true,
+  };
+}
+
+export default function Profile() {
+  const { username } = useParams();
+  const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [error, setError] = useState('');
+  const [following, setFollowing] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const target = username || currentUser?.username;
+      if (!target) {
+        if (alive) setError('Please sign in to view this profile.');
+        return;
+      }
+      setProfile(null);
+      setPosts([]);
+      setError('');
+      try {
+        const { data } = await apiClient.get(`/profiles/${encodeURIComponent(target)}`);
+        if (!alive) return;
+        const loadedProfile = data.user || data.profile || null;
+        if (!loadedProfile) throw new Error('Profile response was empty.');
+        setProfile(loadedProfile);
+        setFollowing(!!(loadedProfile.is_following ?? loadedProfile.isFollowing));
+        setPosts((data.posts || []).map(mapPost));
+      } catch (e) {
+        if (!alive) return;
+        // The suggested “Who to follow” list currently includes demo users.
+        // If a demo user is not in PostgreSQL, show their local demo profile instead
+        // of a misleading “User not found” page. Real database profiles still use the API.
+        const status = e.response?.status;
+        const message = String(e.response?.data?.error || e.message || '').toLowerCase();
+        const isNotFound = status === 404 || message.includes('not found') || message.includes('does not exist');
+        const demo = isNotFound ? mockProfileFor(target) : null;
+        if (demo) {
+          setProfile(demo);
+          setFollowing(!!mockUsers.find((u) => u.username === target)?.isFollowing);
+          const demoUser = mockUsers.find((u) => u.username === target);
+          setPosts(mockPosts.filter((p) => p.userId === demoUser?.id).map(mapPost));
+          setError('');
+        } else {
+          setError(e.response?.data?.error || 'Could not load profile.');
+        }
+      }
+    })();
+    return () => { alive = false; };
+  }, [username, currentUser?.username]);
+
+  const isOwnProfile = String(profile?.id) === String(currentUser?.id) && !profile?.isMockProfile;
+  const toggleFollow = async () => {
+    if (!profile || profile.isMockProfile || busy) return;
+    setBusy(true);
+    try {
+      if (following) await apiClient.delete(`/profiles/${profile.id}/follow`);
+      else await apiClient.post(`/profiles/${profile.id}/follow`);
+      setFollowing(!following);
+    } catch (e) {
+      setError(e.response?.data?.error || 'Could not update follow status.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const displayName = profile?.display_name || profile?.displayName || profile?.username || 'Profile';
+  const usernameLabel = profile?.username || '';
+  const avatar = profile?.avatar_url || profile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(usernameLabel)}`;
+
+  return (
+    <div className="feed-container page-enter" id="profile-page">
+      <div className="page-header">
+        <button className="btn-ghost" onClick={() => navigate(-1)} aria-label="Go back"><FiArrowLeft /></button>
+        <h1>{displayName}</h1>
+      </div>
+      {error && <p className="text-danger text-sm" role="alert">{error}</p>}
+      {profile && <section className="profile-summary" style={{ padding: '16px 0' }}>
+        {(profile.banner_url || profile.banner) && <img src={profile.banner_url || profile.banner} alt="Profile banner" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 12 }} />}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <img src={avatar} alt={`${displayName}'s avatar`} className="avatar avatar-lg" />
+            <div><strong>{displayName}</strong><div className="text-secondary text-sm">@{usernameLabel}</div></div>
+          </div>
+          {!isOwnProfile && !profile.isMockProfile && <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/messages?user=${profile.id}`)}><FiMessageCircle /> Message</button>
+            <button className="btn btn-primary btn-sm" onClick={toggleFollow} disabled={busy}>{following ? <FiUserCheck /> : <FiUserPlus />}{following ? ' Following' : ' Follow'}</button>
+          </div>}
+          {profile.isMockProfile && <span className="text-secondary text-sm">Demo profile</span>}
+        </div>
+        {profile.bio && <p style={{ marginTop: 12 }}>{profile.bio}</p>}
+        <p className="text-secondary text-sm" style={{ marginTop: 8 }}>{profile.followers_count ?? profile.followersCount ?? 0} followers · {profile.following_count ?? profile.followingCount ?? 0} following</p>
+      </section>}
+      <div className="tabs"><button className="tab active">Posts</button></div>
+      {posts.length ? posts.map((post) => <PostCard key={`${post.id}-${post.createdAt || post.created_at || ''}`} post={post} />) : profile && <div className="empty-state"><div className="empty-state-icon">👤</div><p className="font-semibold">No posts yet</p></div>}
+    </div>
+  );
+}

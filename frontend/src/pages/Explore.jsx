@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { trending, users, posts as mockPosts } from '../data/mockData';
 import PostCard from '../components/Post/PostCard';
 import { FiSearch, FiTrendingUp } from 'react-icons/fi';
@@ -7,6 +8,7 @@ import './Explore.css';
 const categories = ['All', 'Technology', 'Education', 'Business', 'Lifestyle'];
 
 export default function Explore() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
 
@@ -97,22 +99,56 @@ export default function Explore() {
           {/* Suggested Users */}
           <div className="explore-users">
             <h2 className="explore-section-title">People to follow</h2>
-            {users.filter((u) => u.id !== 1).map((user) => (
-              <div key={user.id} className="explore-user-card">
-                <img src={user.avatar} alt={user.displayName} className="avatar avatar-lg" />
-                <div className="explore-user-info">
-                  <div className="explore-user-top">
-                    <span className="font-semibold">{user.displayName}</span>
-                    {user.isVerified && <span className="verified-badge" title="Verified">✓</span>}
+            {users.filter((u) => u.id !== 1).map((user) => {
+              const openProfile = () => {
+                if (user.username) {
+                  navigate(`/profile/${encodeURIComponent(user.username)}`);
+                }
+              };
+
+              return (
+                <div key={user.id} className="explore-user-card">
+                  <button
+                    type="button"
+                    onClick={openProfile}
+                    aria-label={`Open ${user.displayName || user.username}'s profile`}
+                    style={{ flexShrink: 0, padding: 0, border: 0, background: 'transparent', cursor: 'pointer' }}
+                  >
+                    <img src={user.avatar} alt={user.displayName || 'User avatar'} className="avatar avatar-lg" />
+                  </button>
+                  <div className="explore-user-info">
+                    <div className="explore-user-top">
+                      <button
+                        type="button"
+                        className="font-semibold"
+                        onClick={openProfile}
+                        style={{ padding: 0, border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                      >
+                        {user.displayName || user.username}
+                      </button>
+                      {user.isVerified && <span className="verified-badge" title="Verified">✓</span>}
+                    </div>
+                    <button
+                      type="button"
+                      className="text-sm text-secondary"
+                      onClick={openProfile}
+                      style={{ display: 'block', padding: 0, border: 0, background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      {user.handle || (user.username ? `@${user.username}` : '')}
+                    </button>
+                    <p className="text-sm text-secondary explore-user-bio">{user.bio}</p>
                   </div>
-                  <span className="text-sm text-secondary">{user.handle}</span>
-                  <p className="text-sm text-secondary explore-user-bio">{user.bio}</p>
+                  <button
+                    type="button"
+                    className={`btn ${user.isFollowing ? 'btn-secondary' : 'btn-primary'} btn-sm`}
+                    onClick={openProfile}
+                    aria-label={`View ${user.displayName || user.username}'s profile`}
+                  >
+                    View profile
+                  </button>
                 </div>
-                <button className={`btn ${user.isFollowing ? 'btn-secondary' : 'btn-primary'} btn-sm`}>
-                  {user.isFollowing ? 'Following' : 'Follow'}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

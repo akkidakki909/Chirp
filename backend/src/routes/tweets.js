@@ -33,7 +33,7 @@ function toPublicTweet(t) {
   return {
     id: t.id, userId: t.user_id, content: t.content, parentTweetId: t.parent_tweet_id,
     likeCount: t.like_count, retweetCount: t.retweet_count, replyCount: t.reply_count,
-    createdAt: t.created_at, imageUrls: t.image_urls || [],
+    createdAt: t.created_at, imageUrls: t.image_urls || [], images: (t.image_urls || []).map(url => url.startsWith('http') ? url : `http://localhost:${process.env.PORT || 5000}${url}`), user: t.username ? { id: t.user_id, username: t.username, displayName: t.display_name || t.username, handle: `@${t.username}`, avatar: t.avatar_url || '', isVerified: !!t.is_verified } : undefined,
   };
 }
 
@@ -97,14 +97,14 @@ router.post('/', requireAuth, upload.array('images', 4), async (req, res) => {
 router.get('/:id/thread', optionalAuth, async (req, res) => {
   const { rows } = await query(
     `WITH RECURSIVE thread AS (
-       SELECT id, user_id, content, parent_tweet_id, created_at, like_count, retweet_count, reply_count, 0 AS depth
+       SELECT id, user_id, content, parent_tweet_id, created_at, like_count, retweet_count, reply_count, image_urls, 0 AS depth
        FROM tweets WHERE id = $1
        UNION ALL
-       SELECT t.id, t.user_id, t.content, t.parent_tweet_id, t.created_at, t.like_count, t.retweet_count, t.reply_count, th.depth + 1
+       SELECT t.id, t.user_id, t.content, t.parent_tweet_id, t.created_at, t.like_count, t.retweet_count, t.reply_count, t.image_urls, th.depth + 1
        FROM tweets t
        JOIN thread th ON t.parent_tweet_id = th.id
      )
-     SELECT * FROM thread ORDER BY depth, created_at;`,
+     SELECT th.*, u.username, u.display_name, u.avatar_url, u.is_verified FROM thread th JOIN users u ON u.id = th.user_id ORDER BY th.depth, th.created_at;`,
     [req.params.id]
   );
   res.json(rows.map(toPublicTweet));
