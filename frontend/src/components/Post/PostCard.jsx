@@ -11,6 +11,8 @@ import PollComponent from './PollComponent';
 import EditHistoryModal from './EditHistoryModal';
 import ReportModal from '../Moderation/ReportModal';
 import './PostCard.css';
+import { apiClient } from '../../api/client';
+import { mediaUrl } from '../../utils/media';
 
 export default function PostCard({ post, onLike, onRepost, onBookmark, onDelete }) {
   const user = post.user;
@@ -51,10 +53,18 @@ export default function PostCard({ post, onLike, onRepost, onBookmark, onDelete 
     onRepost?.(post.id);
   };
 
-  const handleBookmark = (e) => {
+  const handleBookmark = async (e) => {
     e.stopPropagation();
-    setBookmarked(!bookmarked);
-    onBookmark?.(post.id);
+    const next = !bookmarked;
+    setBookmarked(next);
+    try {
+      if (next) await apiClient.post(`/bookmarks/${post.id}`);
+      else await apiClient.delete(`/bookmarks/${post.id}`);
+      onBookmark?.(post.id);
+    } catch (error) {
+      setBookmarked(!next);
+      console.error('Bookmark update failed:', error.response?.data || error.message);
+    }
   };
 
   const goToPost = () => navigate(`/post/${post.id}`);
@@ -117,7 +127,7 @@ export default function PostCard({ post, onLike, onRepost, onBookmark, onDelete 
           {post.images && post.images.length > 0 && (
             <div className={`post-images post-images-${Math.min(post.images.length, 4)}`}>
               {post.images.map((img, i) => (
-                <img key={i} src={img} alt={`Post image ${i + 1}`} className="post-image" />
+                <img key={i} src={mediaUrl(img)} alt={`Post image ${i + 1}`} className="post-image" />
               ))}
             </div>
           )}

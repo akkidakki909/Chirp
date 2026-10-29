@@ -2,42 +2,72 @@ import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { bumpHashtag, checkIdempotency } from '../db/redis.js';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const router = Router();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadDir = path.resolve(__dirname, '../../uploads');
+fs.mkdirSync(uploadDir, { recursive: true });
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 4 },
+  fileFilter: (_req, file, cb) => {
+    if (!['image/jpeg','image/png','image/gif','image/webp'].includes(file.mimetype)) {
+      const err = new Error('Only JPG, PNG, GIF, and WEBP images are supported');
+      err.status = 400; return cb(err);
+    }
+    cb(null, true);
+  },
+});
 
 function toPublicTweet(t) {
   return {
     id: t.id, userId: t.user_id, content: t.content, parentTweetId: t.parent_tweet_id,
     likeCount: t.like_count, retweetCount: t.retweet_count, replyCount: t.reply_count,
-    createdAt: t.created_at,
+    createdAt: t.created_at, imageUrls: t.image_urls || [],
   };
 }
 
 // ---------- Create tweet (extracts hashtags, bumps trending) ----------
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, upload.array('images', 4), async (req, res) => {
+  try {
   const { content, parentTweetId, idempotencyKey } = req.body;
-  if (!content?.trim()) return res.status(400).json({ error: 'content is required' });
+  const text = String(content || '').trim();
+  if (!text) return res.status(400).json({ error: 'Write something before posting (text is required).' });
+  if (text.length > 280) return res.status(400).json({ error: 'Posts must be 280 characters or fewer.' });
+  const imageUrls = (req.files || []).map(file => `/uploads/${file.filename}`);
   if (idempotencyKey) {
-    const isNew = await checkIdempotency(idempotencyKey);
-    if (!isNew) return res.status(409).json({ error: 'Duplicate submission ignored' });
+    try { const isNew = await checkIdempotency(idempotencyKey); if (!isNew) return res.status(409).json({ error: 'Duplicate submission ignored' }); }
+    catch (redisError) { console.warn('Idempotency check skipped because Redis is unavailable:', redisError.message); }
   }
 
   const { rows } = await query(
-    `INSERT INTO tweets (user_id, content, parent_tweet_id, is_reply)
-     VALUES ($1,$2,$3,$4) RETURNING *`,
-    [req.userId, content, parentTweetId || null, !!parentTweetId]
+    `INSERT INTO tweets (user_id, content, parent_tweet_id, is_reply, image_urls)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [req.userId, text, parentTweetId || null, !!parentTweetId, imageUrls]
   );
   const tweet = rows[0];
 
-  // Notify followers about a new top-level post; replies notify the parent author.
-  if (parentTweetId) {
-    const parent = await query('SELECT user_id FROM tweets WHERE id=$1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1', [parentTweetId]);
-    if (parent.rows[0] && parent.rows[0].user_id !== req.userId) {
-      await query("INSERT INTO notifications(user_id,actor_id,type,tweet_id) VALUES($1,$2,'reply',$3)", [parent.rows[0].user_id, req.userId, tweet.id]);
+  // Notifications are secondary: a stale notification constraint must not make post creation appear to fail.
+  try {
+    if (parentTweetId) {
+      const parent = await query('SELECT user_id FROM tweets WHERE id=$1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1', [parentTweetId]);
+      if (parent.rows[0] && parent.rows[0].user_id !== req.userId) {
+        await query("INSERT INTO notifications(user_id,actor_id,type,tweet_id) VALUES($1,$2,'reply',$3)", [parent.rows[0].user_id, req.userId, tweet.id]);
+      }
+    } else {
+      await query("INSERT INTO notifications(user_id,actor_id,type,tweet_id) SELECT follower_id,$1,'post',$2 FROM follows WHERE followee_id=$1 AND follower_id<>$1", [req.userId, tweet.id]);
     }
-  } else {
-    await query("INSERT INTO notifications(user_id,actor_id,type,tweet_id) SELECT follower_id,$1,'post',$2 FROM follows WHERE followee_id=$1 AND follower_id<>$1", [req.userId, tweet.id]);
-  }
+  } catch (notificationError) { console.warn('Post saved; notification creation skipped:', notificationError.message); }
 
   // hashtags: extract, upsert, link, bump Redis trending
   const tags = [...content.matchAll(/#(\w+)/g)].map(m => m[1]);
@@ -52,10 +82,15 @@ router.post('/', requireAuth, async (req, res) => {
        ON CONFLICT DO NOTHING`,
       [tweet.id, tweet.created_at, h[0].id]
     );
-    await bumpHashtag(tag);
+    try { await bumpHashtag(tag); } catch (redisError) { console.warn('Trending score update skipped:', redisError.message); }
   }
 
   res.status(201).json(toPublicTweet(tweet));
+  } catch (error) {
+    console.error('Create tweet error:', error);
+    const status = error.status || 500;
+    res.status(status).json({ error: status === 500 ? 'Could not create post. Check database migration 004_media_bookmarks.sql and backend logs.' : error.message });
+  }
 });
 
 // ---------- Recursive CTE: full thread ----------

@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import authRoutes from './routes/auth.js';
 import tweetRoutes from './routes/tweets.js';
@@ -11,6 +13,7 @@ import followRoutes from './routes/follows.js';
 import engagementRoutes from './routes/engagement.js';
 import searchRoutes from './routes/search.js';
 import analyticsRoutes from './routes/analytics.js';
+import bookmarkRoutes from './routes/bookmarks.js';
 import messageRoutes from './routes/messages.js';
 import notificationRoutes from './routes/notifications.js';
 import profileRoutes from './routes/profiles.js';
@@ -21,6 +24,8 @@ dotenv.config();
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
 app.use(express.json());
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
@@ -30,6 +35,7 @@ app.use('/api/follows', followRoutes);
 app.use('/api', engagementRoutes);       // /api/likes/:id, /api/retweets/:id
 app.use('/api/search', searchRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/profiles', profileRoutes);
@@ -37,7 +43,8 @@ app.use('/api/trending', trendingRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
-  res.status(500).json({ error: 'Internal server error' });
+  const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 400 : 500);
+  res.status(status).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Each image must be 5 MB or smaller.' : (err.message || 'Internal server error') });
 });
 
 const httpServer = createServer(app);

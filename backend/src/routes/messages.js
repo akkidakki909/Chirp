@@ -5,6 +5,18 @@ const router = Router();
 router.use(requireAuth);
 router.get('/conversations', async (req,res) => {
  try {
+  // Seed a few clearly demo-only starter conversations from existing accounts once per user.
+  const hasMessages = await query('SELECT 1 FROM direct_messages WHERE sender_id=$1 OR recipient_id=$1 LIMIT 1', [req.userId]);
+  if (!hasMessages.rows.length) {
+   const people = await query('SELECT id,username,display_name FROM users WHERE id<>$1 AND deleted_at IS NULL ORDER BY created_at ASC LIMIT 4', [req.userId]);
+   const samples = [
+    'Hey! Welcome to Chirp 👋 Feel free to message me here.',
+    'Hi! Have you tried the new trending topics? 🔥',
+    'Hello! Sharing a little inspiration for your next post ✨',
+    'Hey there! Let me know what you are building this week 🚀'
+   ];
+   for (let i=0;i<people.rows.length;i++) await query('INSERT INTO direct_messages(sender_id,recipient_id,content) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [people.rows[i].id, req.userId, `[Demo chat] ${samples[i]}`]);
+  }
   const { rows } = await query(`WITH ranked AS (
    SELECT dm.*, ROW_NUMBER() OVER (PARTITION BY LEAST(sender_id::text,recipient_id::text), GREATEST(sender_id::text,recipient_id::text) ORDER BY created_at DESC) rn
    FROM direct_messages dm WHERE sender_id=$1 OR recipient_id=$1

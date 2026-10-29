@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import apiClient from '../../api/client';
 
@@ -19,6 +19,18 @@ export default function ComposePost({
 
   const [content, setContent] = useState('');
   const [images, setImages] = useState([]);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
+  const emojiGroups = [
+    { name: 'Smileys', items: '😀 😃 😄 😁 😆 😅 😂 🙂 🙃 🫠 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 🥲 😋 😛 😜 🤪 😝 🤗 🤭 🫢 🤫 🤔 🫡 🤐 🤨 😐 😑 😶 🫥 😏 😒 🙄 😬 😮‍💨 🤥 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🤧 🥵 🥶 🥴 😵 🤯 🤠 🥳 🥸 😎 🤓 🧐'.split(' ') },
+    { name: 'Gestures', items: '👋 🤚 🖐️ ✋ 🖖 🫱 🫲 🫳 🫴 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 🖕 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🙏 ✍️ 💪 🦾 🫵'.split(' ') },
+    { name: 'Hearts', items: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 🩷 🩵 🩶 💔 ❤️‍🔥 ❤️‍🩹 💕 💞 💓 💗 💖 💘 💝 💟 ❣️ 💌'.split(' ') },
+    { name: 'Nature', items: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🦄 🐝 🦋 🐢 🐬 🐳 🦖 🌵 🌲 🌳 🌴 🌱 🌿 ☘️ 🍀 🌷 🌹 🌻 🌼 🌸 💐 🍁 🍂 🍃'.split(' ') },
+    { name: 'Food', items: '🍎 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🥑 🍆 🥦 🥕 🌽 🌶️ 🥒 🥬 🥔 🍠 🥐 🍞 🧀 🍕 🍔 🍟 🌭 🌮 🌯 🥗 🍝 🍜 🍣 🍩 🍪 🎂 🍰 🍫 🍿 ☕ 🧋'.split(' ') },
+    { name: 'Activities', items: '⚽ 🏀 🏈 ⚾ 🎾 🏐 🎱 🏓 🏸 🥊 🥋 🏆 🥇 🥈 🥉 🎮 🎯 🎲 🎸 🎹 🎧 🎤 🎬 🎨 🧩 🚀 ✈️ 🚗 🚲 🏕️ 🌈 ☀️ 🌙 ⭐ 🌟 ✨ ⚡ 🔥 💯 🎉 🎊 🎈 🎁 🪄 💡 📚 💻 📱'.split(' ') },
+    { name: 'Symbols', items: '✅ ☑️ ✔️ ❌ ❎ ➕ ➖ ➗ 💲 ♻️ ⚠️ 🚫 ⛔ 🔞 🔔 🔕 📣 💬 💭 🗯️ 💢 💥 💫 💤 🔥 💦 💨 🕊️ 🏳️‍🌈 🏳️‍⚧️'.split(' ') },
+  ];
   const [showPollCreator, setShowPollCreator] = useState(false);
 
   const [pollOptions, setPollOptions] = useState([
@@ -29,7 +41,7 @@ export default function ComposePost({
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
 
-  const maxLength = 500;
+  const maxLength = 280;
 
   const charCount = content.length;
   const charPercent = (charCount / maxLength) * 100;
@@ -48,9 +60,10 @@ export default function ComposePost({
     setError('');
 
     try {
-      const response = await apiClient.post('/tweets', {
-        content: content.trim(),
-      });
+      const formData = new FormData();
+      formData.append('content', content.trim());
+      images.forEach((file) => formData.append('images', file));
+      const response = await apiClient.post('/tweets', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 
       /*
        * Backend returns the newly created tweet.
@@ -76,7 +89,7 @@ export default function ComposePost({
         isBookmarked: false,
         isEdited: false,
 
-        images: [],
+        images: (tweet.imageUrls || []).map((url) => url.startsWith('http') ? url : `http://localhost:5000${url}`),
         poll: null,
         editHistory: [],
 
@@ -157,6 +170,7 @@ export default function ComposePost({
 
         {/* Text input */}
         <textarea
+          ref={textareaRef}
           className="compose-textarea"
           placeholder={placeholder}
           value={content}
@@ -179,6 +193,18 @@ export default function ComposePost({
             {error}
           </div>
         )}
+
+        {images.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '10px 0' }}>
+          {images.map((file, index) => <div key={`${file.name}-${index}`} style={{ position: 'relative' }}>
+            <img src={URL.createObjectURL(file)} alt={file.name} style={{ width: 92, height: 76, objectFit: 'cover', borderRadius: 10 }} />
+            <button type="button" aria-label="Remove image" onClick={() => setImages((prev) => prev.filter((_, i) => i !== index))} style={{ position: 'absolute', top: 3, right: 3, borderRadius: '50%', border: 0, cursor: 'pointer' }}><FiX size={14} /></button>
+          </div>)}
+          <small style={{ width: '100%', color: 'var(--color-text-tertiary)' }}>{images.length}/4 images · 5 MB max each</small>
+        </div>}
+
+        {showEmojiPicker && <div className="compose-emoji-picker" style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 10, margin: '8px 0', maxHeight: 220, overflowY: 'auto' }}>
+          {emojiGroups.map((group) => <div key={group.name} style={{ marginBottom: 8 }}><div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>{group.name}</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{group.items.map((emoji, i) => <button key={`${group.name}-${i}`} type="button" title={emoji} onClick={() => { const el = textareaRef.current; const start = el?.selectionStart ?? content.length; const end = el?.selectionEnd ?? content.length; const next = content.slice(0,start)+emoji+content.slice(end); setContent(next); requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(start+emoji.length,start+emoji.length); }); }} style={{ border: 0, background: 'transparent', cursor: 'pointer', fontSize: 21, padding: 3, borderRadius: 5 }}>{emoji}</button>)}</div></div>)}
+        </div>}
 
         {/* Poll Creator */}
         {showPollCreator && (
@@ -233,13 +259,17 @@ export default function ComposePost({
 
           <div className="compose-tools">
 
-            <button
-              className="compose-tool"
-              title="Add image"
-              type="button"
-            >
+            <button className="compose-tool" title="Add images from your device" type="button" onClick={() => fileInputRef.current?.click()}>
               <FiImage size={18} />
             </button>
+            <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden onChange={(e) => {
+              const selected = Array.from(e.target.files || []);
+              const valid = selected.filter((file) => file.size <= 5 * 1024 * 1024).slice(0, Math.max(0, 4 - images.length));
+              if (selected.some((file) => file.size > 5 * 1024 * 1024)) setError('Each image must be 5 MB or smaller.');
+              else setError('');
+              setImages((prev) => [...prev, ...valid].slice(0, 4));
+              e.target.value = '';
+            }} />
 
             <button
               className={`compose-tool ${
@@ -258,11 +288,7 @@ export default function ComposePost({
               <FiBarChart2 size={18} />
             </button>
 
-            <button
-              className="compose-tool"
-              title="Emoji"
-              type="button"
-            >
+            <button className={`compose-tool ${showEmojiPicker ? 'active' : ''}`} title="Choose emoji" type="button" onClick={() => setShowEmojiPicker((v) => !v)}>
               <FiSmile size={18} />
             </button>
 

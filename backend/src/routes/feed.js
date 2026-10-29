@@ -54,6 +54,8 @@ router.get('/', requireAuth, async (req, res) => {
           t.retweet_count,
           t.reply_count,
           t.created_at,
+          t.image_urls,
+          EXISTS (SELECT 1 FROM bookmarks b WHERE b.user_id = $1 AND b.tweet_id = t.id) AS is_bookmarked,
 
           u.username,
           u.display_name,
@@ -105,6 +107,8 @@ router.get('/', requireAuth, async (req, res) => {
           t.retweet_count,
           t.reply_count,
           t.created_at,
+          t.image_urls,
+          EXISTS (SELECT 1 FROM bookmarks b WHERE b.user_id = $1 AND b.tweet_id = t.id) AS is_bookmarked,
 
           u.username,
           u.display_name,
@@ -165,7 +169,8 @@ router.get('/', requireAuth, async (req, res) => {
 
       isReposted: false,
 
-      isBookmarked: false,
+      isBookmarked: Boolean(tweet.is_bookmarked),
+      images: (tweet.image_urls || []).map((url) => url.startsWith('http') ? url : `http://localhost:${process.env.PORT || 5000}${url}`),
 
       // User information
       user: {
