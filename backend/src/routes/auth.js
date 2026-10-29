@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '../db/pool.js';
 
+import { requireAuth } from '../middleware/auth.js';
+
 const router = Router();
 
 function toPublicUser(u) {
@@ -11,6 +13,7 @@ function toPublicUser(u) {
     email: u.email, bio: u.bio, avatar: u.avatar_url, banner: u.banner_url,
     isVerified: u.is_verified, followersCount: u.followers_count,
     followingCount: u.following_count, postsCount: u.posts_count,
+    role: u.role,
   };
 }
 
@@ -36,6 +39,27 @@ router.post('/register', async (req, res) => {
   }
 });
 
+
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM users
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [req.userId]
+    );
+
+    if (!rows.length) {
+      return res.status(401).json({ error: 'Account not found or disabled.' });
+    }
+
+    return res.json({ user: toPublicUser(rows[0]) });
+  } catch (error) {
+    console.error('Restore session failed:', error.message);
+    return res.status(500).json({ error: 'Could not verify session.' });
+  }
+});
+
+
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   const { rows } = await query('SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL', [email]);
@@ -46,5 +70,7 @@ router.post('/login', async (req, res) => {
   const token = jwt.sign({ sub: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
   res.json({ token, user: toPublicUser(user) });
 });
+
+
 
 export default router;

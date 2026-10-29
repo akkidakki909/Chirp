@@ -5,8 +5,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-
+import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import tweetRoutes from './routes/tweets.js';
 import feedRoutes from './routes/feed.js';
@@ -19,20 +18,22 @@ import messageRoutes from './routes/messages.js';
 import notificationRoutes from './routes/notifications.js';
 import profileRoutes from './routes/profiles.js';
 import trendingRoutes from './routes/trending.js';
+import reportRoutes from './routes/reports.js';
 
 dotenv.config();
 
 const app = express();
 app.use('/api/bookmarks', bookmarkRoutes);
+app.use('/api/reports', reportRoutes);
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
 app.use(express.json());
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
-
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/tweets', tweetRoutes);
 app.use('/api/feed', feedRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/follows', followRoutes);
 app.use('/api', engagementRoutes);       // /api/likes/:id, /api/retweets/:id
 app.use('/api/search', searchRoutes);

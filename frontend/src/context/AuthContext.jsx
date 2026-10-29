@@ -1,102 +1,103 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import apiClient from '../api/client';
-import { currentUser as mockUser } from '../data/mockData';
 
 const AuthContext = createContext(null);
 
-const DEMO_EMAIL = 'aditya_dev@example.com';
-const DEMO_PASSWORD = 'password123';
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('chirp_user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    try {
+      const saved = localStorage.getItem('chirp_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState(
-    () => !!localStorage.getItem('token')
+    () => Boolean(localStorage.getItem('token'))
   );
 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const startDemoSession = async () => {
-      const existingToken = localStorage.getItem('token');
+    let active = true;
 
-      if (existingToken) {
-        const savedUser = localStorage.getItem('chirp_user');
+    async function restoreSession() {
+      const token = localStorage.getItem('token');
 
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
-          setIsAuthenticated(true);
+      if (!token) {
+        if (active) {
+          setUser(null);
+          setIsAuthenticated(false);
           setLoading(false);
-          return;
         }
+        return;
       }
 
       try {
-        // Automatically login using the seeded demo account.
-        const response = await apiClient.post('/auth/login', {
-          email: DEMO_EMAIL,
-          password: DEMO_PASSWORD,
-        });
+        // Verify that the saved token is still accepted by the server.
+        await apiClient.get('/auth/me');
 
-        const { token, user: loggedInUser } = response.data;
+        if (active) {
+          const saved = localStorage.getItem('chirp_user');
+          setUser(saved ? JSON.parse(saved) : null);
+          setIsAuthenticated(true);
+        }
+      } catch {
+        localStorage.removeItem('token');
+        localStorage.removeItem('chirp_user');
 
-        localStorage.setItem('token', token);
-        localStorage.setItem('chirp_user', JSON.stringify(loggedInUser));
-
-        setUser(loggedInUser);
-        setIsAuthenticated(true);
-      } catch (error) {
-        console.error('Demo login failed:', error);
-
-        // Keep the UI usable even if backend login is temporarily unavailable.
-        setUser(mockUser);
-        setIsAuthenticated(false);
+        if (active) {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
-    };
+    }
 
-    startDemoSession();
+    restoreSession();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const login = async (email, password) => {
-    const response = await apiClient.post('/auth/login', {
+    const { data } = await apiClient.post('/auth/login', {
       email,
       password,
     });
 
-    const { token, user: loggedInUser } = response.data;
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('chirp_user', JSON.stringify(data.user));
 
-    localStorage.setItem('token', token);
-    localStorage.setItem('chirp_user', JSON.stringify(loggedInUser));
-
-    setUser(loggedInUser);
+    setUser(data.user);
     setIsAuthenticated(true);
 
-    return loggedInUser;
+    return data.user;
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('chirp_user');
-
     setUser(null);
     setIsAuthenticated(false);
   };
 
   const updateProfile = (updates) => {
-    setUser((prev) => {
-      const updatedUser = { ...prev, ...updates };
+    setUser((previous) => {
+      if (!previous) return previous;
 
-      localStorage.setItem(
-        'chirp_user',
-        JSON.stringify(updatedUser)
-      );
-
-      return updatedUser;
+      const updated = { ...previous, ...updates };
+      localStorage.setItem('chirp_user', JSON.stringify(updated));
+      return updated;
     });
   };
 

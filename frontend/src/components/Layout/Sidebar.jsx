@@ -19,7 +19,7 @@ const navItems = [
 ];
 
 export default function Sidebar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -75,6 +75,16 @@ export default function Sidebar() {
             <span className="sidebar-user-handle text-secondary truncate">{user?.handle}</span>
           </div>
           <FiMoreHorizontal className="sidebar-user-more" />
+          <button
+           className="user-menu-item text-danger"
+             onClick={() => {
+             setShowUserMenu(false);
+             logout();
+               navigate('/login', { replace: true });
+               }}
+>
+  <FiLogOut /> Log out
+</button>
 
           {showUserMenu && (
             <div className="user-menu animate-slide-up" id="user-menu">
