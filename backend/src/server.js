@@ -6,6 +6,7 @@ import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+
 import authRoutes from './routes/auth.js';
 import tweetRoutes from './routes/tweets.js';
 import feedRoutes from './routes/feed.js';
@@ -22,6 +23,7 @@ import trendingRoutes from './routes/trending.js';
 dotenv.config();
 
 const app = express();
+app.use('/api/bookmarks', bookmarkRoutes);
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
 app.use(express.json());
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
